@@ -94,7 +94,7 @@ python -m pytest -v
 
 - [x] Extract orders and products.
 - [x] Validate, normalize, and transform data.
-- [x] Add automated Transform tests.
+- [x] Add automated tests.
 - [ ] Design the PostgreSQL schema and implement data loading with UPSERT.
 - [ ] Add end-to-end ETL orchestration and logging.
 - [ ] Add Docker Compose for reproducible local execution.
