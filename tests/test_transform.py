@@ -611,26 +611,27 @@ def test_validate_orders_revenue_boundaries():
     assert invalid["unit_price"].iloc[0] == "9999999999.99"
 
 
-
 def test_transform_data_unmatched_preserves_raw_values():
-    orders = pd.DataFrame({
-        "order_item_id": ["000501"],
-        "order_id": ["00101"],
-        "product_id": ["999"],
-        "quantity": ["2"],
-        "unit_price": ["100.50"],
-        "date": ["2026-11-26"],
-    })
-
-    products = pd.DataFrame({
-        "id": ["5"],
-        "title": ["Keyboard"],
-        "category": ["Electronics"],
-    })
-
-    processed, invalid_orders, invalid_products = transform_data(
-        orders, products
+    orders = pd.DataFrame(
+        {
+            "order_item_id": ["000501"],
+            "order_id": ["00101"],
+            "product_id": ["999"],
+            "quantity": ["2"],
+            "unit_price": ["100.50"],
+            "date": ["2026-11-26"],
+        }
     )
+
+    products = pd.DataFrame(
+        {
+            "id": ["5"],
+            "title": ["Keyboard"],
+            "category": ["Electronics"],
+        }
+    )
+
+    processed, invalid_orders, invalid_products = transform_data(orders, products)
 
     assert processed.empty
     assert invalid_products.empty
@@ -646,6 +647,4 @@ def test_transform_data_unmatched_preserves_raw_values():
     assert raw_order["unit_price"] == "100.50"
     assert raw_order["date"] == "2026-11-26"
 
-    assert raw_order["validation_errors"] == [
-        "unmatched_product_id"
-    ]
+    assert raw_order["validation_errors"] == ["unmatched_product_id"]
