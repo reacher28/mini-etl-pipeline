@@ -17,7 +17,12 @@ def test_extract_orders(tmp_path):
     )
     filepath = tmp_path / "orders.csv"
     expected_orders.to_csv(filepath, index=False)
+    expected_orders["unit_price"] = expected_orders["unit_price"].astype("string")
     result = extract_orders(filepath)
+
+    id_columns = ["order_item_id", "order_id", "product_id"]
+    expected_orders[id_columns] = expected_orders[id_columns].astype("string")
+
     pd.testing.assert_frame_equal(expected_orders, result)
 
 
@@ -110,3 +115,93 @@ def test_extract_products_http_error(monkeypatch):
         extract_products("https://example.test/products")
 
     assert call_count == 1
+
+
+def test_extract_orders_preserves_bigint(tmp_path):
+    filepath = tmp_path / "orders.csv"
+
+    filepath.write_text(
+        "order_item_id,order_id,product_id,quantity,unit_price,date\n"
+        "1,9223372036854775807,5,2,100,2026-11-24\n"
+        "2,9007199254740993,,3,200,2026-11-24\n",
+        encoding="utf-8",
+    )
+
+    orders = extract_orders(str(filepath))
+
+    assert orders["order_id"].tolist() == [
+        "9223372036854775807",
+        "9007199254740993",
+    ]
+
+    assert orders["order_id"].dtype == "string"
+    assert orders["product_id"].dtype == "string"
+    assert pd.isna(orders["product_id"].iloc[1])
+
+
+@pytest.mark.parametrize(
+    "payload, error_message",
+    [
+        ([], "JSON object"),
+        ({}, "products"),
+        ({"products": {"id": 1}}, "must be a list"),
+        ({"products": [123]}, "must be an object"),
+    ],
+)
+def test_extract_products_invalid_response(monkeypatch, payload, error_message):
+    class FakeResponse:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return payload
+
+    def fake_get(api_url, timeout=10):
+        return FakeResponse()
+
+    monkeypatch.setattr(requests, "get", fake_get)
+
+    with pytest.raises(ValueError, match=error_message):
+        extract_products("https://example.test/products")
+
+
+def test_extract_products_empty_list(monkeypatch):
+    class FakeResponse:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"products": []}
+
+    def fake_get(api_url, timeout=10):
+        return FakeResponse()
+
+    monkeypatch.setattr(requests, "get", fake_get)
+
+    result = extract_products("https://example.test/products")
+
+    expected = pd.DataFrame(columns=["id", "title", "category"])
+
+    pd.testing.assert_frame_equal(result, expected)
+
+
+def test_extract_products_missing_category(monkeypatch):
+    products = [{"id": 1, "title": "Keyboard"}]
+
+    class FakeResponse:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"products": products}
+
+    def fake_get(api_url, timeout=10):
+        return FakeResponse()
+
+    monkeypatch.setattr(requests, "get", fake_get)
+
+    result = extract_products("https://example.test/products")
+
+    assert result["id"].iloc[0] == 1
+    assert result["title"].iloc[0] == "Keyboard"
+    assert pd.isna(result["category"].iloc[0])
